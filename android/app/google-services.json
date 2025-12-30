@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1075151975040",
+    "project_id": "amasya-son-dakika",
+    "storage_bucket": "amasya-son-dakika.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1075151975040:android:1353fba2c92f8764f92c65",
+        "android_client_info": {
+          "package_name": "com.example.amasyasondakika"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvBBkaAq-gw4hE4VsXdWJqELtYEks4NCI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
