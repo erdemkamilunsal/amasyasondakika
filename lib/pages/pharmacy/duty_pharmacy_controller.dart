@@ -1,47 +1,48 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
-class DutyPharmacyController {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+class DutyPharmacyController extends ChangeNotifier {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Future<Map<String, dynamic>> fetchPharmacies() async {
+  bool isLoading = true;
+  String? error;
+
+  /// İlçe -> Eczane Listesi
+  Map<String, List<Map<String, dynamic>>> pharmaciesByDistrict = {};
+
+  Future<void> fetch() async {
     try {
-      // 🔥 ALT KOLEKSİYON
-      final snapshot = await _db
-          .collection("duty_pharmacy")
-          .doc("amasya")
-          .collection("districts")
+      isLoading = true;
+      notifyListeners();
+
+      final doc = await _firestore
+          .collection('duty_pharmacy')
+          .doc('amasya')
           .get();
 
-      if (snapshot.docs.isEmpty) {
-        return {
-          "error": false,
-          "data": {},
-          "message": "Liste boş",
-        };
+      if (!doc.exists) {
+        error = "Eczane verisi bulunamadı";
+        return;
       }
 
-      /// 🔥 Yapıyı normal map'e çevir
-      final Map<String, dynamic> result = {};
+      final data = doc.data()!;
+      final List districts = List.from(data['districts'] ?? []);
+      final Map rawData = Map.from(data['data'] ?? {});
 
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        result[doc.id] = List<Map<String, dynamic>>.from(
-          (data["list"] ?? []).map(
-                (e) => Map<String, dynamic>.from(e),
-          ),
-        );
+      pharmaciesByDistrict.clear();
+
+      for (final district in districts) {
+        final list = rawData[district] ?? [];
+        pharmaciesByDistrict[district] =
+        List<Map<String, dynamic>>.from(list);
       }
 
-      return {
-        "error": false,
-        "data": result,
-      };
+      error = null;
     } catch (e) {
-      return {
-        "error": true,
-        "message": "Veri alınırken hata oluştu: $e",
-        "data": {}
-      };
+      error = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
     }
   }
 }

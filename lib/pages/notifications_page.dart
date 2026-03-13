@@ -5,14 +5,8 @@ class NotificationsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Bildirimler"),
-        backgroundColor: Colors.red,
-      ),
-      body: const Center(
-        child: Text("Henüz bir bildiriminiz yok."),
-      ),
+    return const Center(
+      child: Text("Henüz bir bildiriminiz yok."),
     );
   }
 }

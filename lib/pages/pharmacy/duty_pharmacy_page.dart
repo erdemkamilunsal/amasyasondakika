@@ -1,81 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'duty_pharmacy_controller.dart';
-import 'widgets/duty_pharmacy_section.dart';
+import 'widgets/duty_pharmacy_card.dart';
 
-class DutyPharmacyPage extends StatefulWidget {
+class DutyPharmacyPage extends StatelessWidget {
   const DutyPharmacyPage({super.key});
 
   @override
-  State<DutyPharmacyPage> createState() => _DutyPharmacyPageState();
-}
-
-class _DutyPharmacyPageState extends State<DutyPharmacyPage> {
-  final DutyPharmacyController controller = DutyPharmacyController();
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Nöbetçi Eczaneler"),
-        backgroundColor: Colors.red,
-      ),
+    return ChangeNotifierProvider<DutyPharmacyController>(
+      create: (_) => DutyPharmacyController()..fetch(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("Nöbetçi Eczaneler"),
+        ),
+        body: Consumer<DutyPharmacyController>(
+          builder: (context, c, _) {
+            if (c.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: controller.fetchPharmacies(), // <-- doğru metot adı
-        builder: (context, snapshot) {
-          // loading
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: Colors.red),
-            );
-          }
+            if (c.error != null) {
+              return Center(child: Text(c.error!));
+            }
 
-          // hata veya olmayan doc
-          if (!snapshot.hasData || snapshot.data == null) {
-            return const Center(
-              child: Text("Veri bulunamadı."),
-            );
-          }
+            return ListView(
+              padding: const EdgeInsets.all(12),
+              children: c.pharmaciesByDistrict.entries.map((entry) {
+                final district = entry.key;
+                final pharmacies = entry.value;
 
-          final result = snapshot.data!;
-
-          // controller dönen yapıda hata varsa göster
-          if (result["error"] == true) {
-            final msg = result["message"] ?? "Bir hata oluştu.";
-            return Center(child: Text(msg));
-          }
-
-          // 'data' alanını çek (bu bizim districts map'imiz)
-          final rawData = Map<String, dynamic>.from(result["data"] ?? {});
-
-          if (rawData.isEmpty) {
-            return const Center(child: Text("Nöbetçi eczane verisi boş."));
-          }
-
-          // rawData: { "Merkez": [ {...}, {...} ], "Merzifon": [ ... ], ... }
-          // Convert to ordered list of entries
-          final entries = rawData.entries.toList();
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: entries.map((entry) {
-                final districtName = entry.key;
-                final listDynamic = entry.value ?? [];
-                // safety cast to List<Map<String,dynamic>>
-                final pharmacies = List<Map<String, dynamic>>.from(
-                  (listDynamic as List).map((e) => Map<String, dynamic>.from(e as Map)),
-                );
-
-                return DutyPharmacySection(
-                  districtName: districtName,
-                  pharmacies: pharmacies,
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      district,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    if (pharmacies.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 16),
+                        child: Text("Bugün nöbetçi eczane yok"),
+                      ),
+                    ...pharmacies.map(
+                          (p) => DutyPharmacyCard(pharmacy: p),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
                 );
               }).toList(),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
