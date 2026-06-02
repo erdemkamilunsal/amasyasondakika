@@ -16,6 +16,9 @@ class NewsModel {
   /// "enclosure" | "media" | "html" | "direct" | "none"
   final String imageSource;
 
+  final String category;
+  final String categorySlug;
+
   final DateTime pubDate;
 
   /// Firestore serverTimestamp ise ilk anda null gelebilir
@@ -30,11 +33,19 @@ class NewsModel {
     required this.sourceUrl,
     required this.imageUrl,
     required this.pubDate,
+    this.category = "Genel",
+    this.categorySlug = "genel",
     this.imageType = "none",
     this.imageSource = "none",
     this.createdAt,
     this.updatedAt,
   });
+
+  static String _readString(dynamic value, {String fallback = ''}) {
+    if (value == null) return fallback;
+    if (value is String) return value.trim();
+    return value.toString().trim();
+  }
 
   static DateTime _parseDate(dynamic raw, {DateTime? fallback}) {
     fallback ??= DateTime.now();
@@ -86,40 +97,60 @@ class NewsModel {
     if (u.isEmpty) return null;
 
     if (u.startsWith('//')) u = 'https:$u';
-    if (u.startsWith('http://')) u = u.replaceFirst('http://', 'https://');
+
+    if (u.startsWith('http://')) {
+      u = u.replaceFirst('http://', 'https://');
+    }
 
     if (!u.startsWith('http')) return null;
+
     return u;
   }
 
-  factory NewsModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory NewsModel.fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> doc,
+      ) {
     final data = doc.data() ?? {};
 
-    // Yeni şema: imageUrl / sourceUrl
-    // Legacy uyum: image / source
-    final image = _sanitizeImageUrl(data['imageUrl']) ?? _sanitizeImageUrl(data['image']);
+    final image =
+        _sanitizeImageUrl(data['imageUrl']) ??
+            _sanitizeImageUrl(data['image']);
 
-    final sourceUrl = (data['sourceUrl'] ?? data['source'] ?? '') is String
-        ? (data['sourceUrl'] ?? data['source'] ?? '') as String
-        : '';
+    final sourceUrl = _readString(
+      data['sourceUrl'] ?? data['source'],
+    );
 
-    final link = (data['link'] ?? '') is String ? data['link'] as String : '';
-    final title = (data['title'] ?? '') is String ? data['title'] as String : '';
-    final description =
-    (data['description'] ?? '') is String ? data['description'] as String : '';
+    final link = _readString(
+      data['link'],
+    );
 
-    final pubDate = _parseDate(data['pubDate']);
+    final title = _readString(
+      data['title'],
+    );
 
-    final imageType = (data['imageType'] is String)
-        ? data['imageType'] as String
-        : (image == null ? 'none' : 'real');
+    final description = _readString(
+      data['description'],
+    );
 
-    final imageSource = (data['imageSource'] is String)
-        ? data['imageSource'] as String
-        : (image == null ? 'none' : 'direct');
+    final category = _readString(
+      data['category'],
+      fallback: 'Genel',
+    );
 
-    final createdAt = _parseDateOrNull(data['createdAt']);
-    final updatedAt = _parseDateOrNull(data['updatedAt']);
+    final categorySlug = _readString(
+      data['categorySlug'],
+      fallback: 'genel',
+    );
+
+    final imageType = _readString(
+      data['imageType'],
+      fallback: image == null ? 'none' : 'real',
+    );
+
+    final imageSource = _readString(
+      data['imageSource'],
+      fallback: image == null ? 'none' : 'direct',
+    );
 
     return NewsModel(
       id: doc.id,
@@ -128,11 +159,17 @@ class NewsModel {
       link: link,
       sourceUrl: sourceUrl,
       imageUrl: image,
-      pubDate: pubDate,
-      imageType: imageType,
-      imageSource: imageSource,
-      createdAt: createdAt,
-      updatedAt: updatedAt,
+      category: category.isEmpty ? 'Genel' : category,
+      categorySlug: categorySlug.isEmpty ? 'genel' : categorySlug,
+      pubDate: _parseDate(data['pubDate']),
+      imageType: imageType.isEmpty
+          ? (image == null ? 'none' : 'real')
+          : imageType,
+      imageSource: imageSource.isEmpty
+          ? (image == null ? 'none' : 'direct')
+          : imageSource,
+      createdAt: _parseDateOrNull(data['createdAt']),
+      updatedAt: _parseDateOrNull(data['updatedAt']),
     );
   }
 }

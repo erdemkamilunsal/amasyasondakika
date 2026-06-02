@@ -21,15 +21,17 @@ class NormalizeNews {
     // --- LINK ---
     final link = raw['link']?.toString() ?? '';
 
+    // --- CATEGORY ---
+    final category = _extractCategory(raw);
+    final categorySlug = _createCategorySlug(category);
+
     // --- IMAGE CANDIDATES ---
     final List<ImageCandidate> imageCandidates = [];
 
-    // yeni şema
     if (raw['imageUrl'] is String) {
       imageCandidates.add(ImageCandidate(raw['imageUrl'], 'direct'));
     }
 
-    // legacy
     if (raw['image'] is String) {
       imageCandidates.add(ImageCandidate(raw['image'], 'direct'));
     }
@@ -51,9 +53,11 @@ class NormalizeNews {
     // --- DATE ---
     final pubDate = _parseDate(raw['pubDate']);
 
-    // optional timestamps
-    final createdAt = raw.containsKey('createdAt') ? _parseDateOrNull(raw['createdAt']) : null;
-    final updatedAt = raw.containsKey('updatedAt') ? _parseDateOrNull(raw['updatedAt']) : null;
+    final createdAt =
+    raw.containsKey('createdAt') ? _parseDateOrNull(raw['createdAt']) : null;
+
+    final updatedAt =
+    raw.containsKey('updatedAt') ? _parseDateOrNull(raw['updatedAt']) : null;
 
     return NewsModel(
       id: _stableId(link),
@@ -63,11 +67,50 @@ class NormalizeNews {
       sourceUrl: sourceUrl,
       pubDate: pubDate,
       imageUrl: imageResult.url,
-      imageType: imageResult.type,     // "real"/"none"
-      imageSource: imageResult.source, // "enclosure"/"media"/...
+      imageType: imageResult.type,
+      imageSource: imageResult.source,
+      category: category,
+      categorySlug: categorySlug,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
+  }
+
+  static String _extractCategory(Map<String, dynamic> raw) {
+    final direct = raw['category'];
+
+    if (direct is String && direct.trim().isNotEmpty) {
+      return direct.trim();
+    }
+
+    final categories = raw['categories'];
+
+    if (categories is List && categories.isNotEmpty) {
+      final first = categories.first;
+      if (first is String && first.trim().isNotEmpty) {
+        return first.trim();
+      }
+    }
+
+    return 'Genel';
+  }
+
+  static String _createCategorySlug(String category) {
+    var value = category.trim().toLowerCase();
+
+    value = value
+        .replaceAll('ç', 'c')
+        .replaceAll('ğ', 'g')
+        .replaceAll('ı', 'i')
+        .replaceAll('ö', 'o')
+        .replaceAll('ş', 's')
+        .replaceAll('ü', 'u');
+
+    value = value
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+
+    return value.isEmpty ? 'genel' : value;
   }
 
   static DateTime _parseDate(dynamic value) {

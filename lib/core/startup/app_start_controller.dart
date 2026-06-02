@@ -13,32 +13,44 @@ class AppStartController extends StatefulWidget {
 }
 
 class _AppStartControllerState extends State<AppStartController> {
-  bool? hasSeen;
+  bool? hasSeenDistrictSelection;
 
   @override
   void initState() {
     super.initState();
-    checkStartup();
+    _checkStartup();
   }
 
-  Future<void> checkStartup() async {
-    await Future.delayed(const Duration(milliseconds: 600)); // smooth açılış
+  Future<void> _checkStartup() async {
     final prefs = await SharedPreferences.getInstance();
-    final seen = prefs.getBool("hasSeenDistrictSelection") ?? false;
+    final seen = prefs.getBool('hasSeenDistrictSelection') ?? false;
+
+    if (!mounted) return;
 
     setState(() {
-      hasSeen = seen;
+      hasSeenDistrictSelection = seen;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (hasSeen == null) {
-      return const SplashScreen();
+    if (hasSeenDistrictSelection == null) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.red),
+        ),
+      );
     }
 
-    return hasSeen!
-        ? const MainNavigationPage()
-        : const DistrictSelectionPage();
+    if (hasSeenDistrictSelection!) {
+      return const SplashScreen(
+        nextPage: MainNavigationPage(),
+      );
+    }
+
+    return const SplashScreen(
+      nextPage: DistrictSelectionPage(),
+    );
   }
 }

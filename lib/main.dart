@@ -1,35 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'firebase_options.dart';
-import 'pages/navigation/main_navigation_page.dart';
-import 'pages/district_selection_page.dart';
+import 'core/startup/app_start_controller.dart';
 
-/// ✅ MUST be top-level and annotated for AOT (release) background execution.
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+FlutterLocalNotificationsPlugin();
+
+const AndroidNotificationChannel hourlyNewsChannel = AndroidNotificationChannel(
+  'hourly_news_channel_v1',
+  'Saatlik Haberler',
+  description: 'Saatlik haber bildirimleri',
+  importance: Importance.high,
+  sound: RawResourceAndroidNotificationSound('hourly_news_sound'),
+);
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Firebase init required in background isolate
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
-  // Debug:
-  // print("BG message: ${message.messageId}");
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ Register background handler as early as possible
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // ✅ Permission (iOS + Android 13+)
+  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const initSettings = InitializationSettings(android: androidInit);
+
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+      AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(hourlyNewsChannel);
+
   try {
     await FirebaseMessaging.instance.requestPermission(
       alert: true,
@@ -40,20 +53,41 @@ Future<void> main() async {
     print("Permission error >>> $e");
   }
 
-  // ✅ Token + topic subscribe (retry)
   unawaited(_initFcm());
 
-  // ✅ Foreground messages (only logs)
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    final title = message.notification?.title ?? "";
-    final body = message.notification?.body ?? "";
-    print("Foreground notification: $title | $body");
+    final notification = message.notification;
+    final android = message.notification?.android;
+
+    if (notification != null && android != null) {
+      flutterLocalNotificationsPlugin.show(
+        notification.hashCode,
+        notification.title,
+        notification.body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            hourlyNewsChannel.id,
+            hourlyNewsChannel.name,
+            channelDescription: hourlyNewsChannel.description,
+            importance: Importance.high,
+            priority: Priority.high,
+            sound: const RawResourceAndroidNotificationSound(
+              'hourly_news_sound',
+            ),
+            icon: '@mipmap/ic_launcher',
+          ),
+        ),
+      );
+    } else {
+      final title = message.notification?.title ?? '';
+      final body = message.notification?.body ?? '';
+      print("Foreground notification: $title | $body");
+    }
   });
 
   runApp(const MyApp());
 }
 
-/// Separate function to keep main clean + easier debug.
 Future<void> _initFcm() async {
   final delays = [0, 5, 15, 30, 60, 120];
 
@@ -67,6 +101,9 @@ Future<void> _initFcm() async {
       await FirebaseMessaging.instance.subscribeToTopic("daily_digest");
       print("✅ Subscribed to topic: daily_digest");
 
+      await FirebaseMessaging.instance.subscribeToTopic("hourly_news");
+      print("✅ Subscribed to topic: hourly_news");
+
       break;
     } catch (e) {
       print("⚠️ Topic subscribe denemesi başarısız (sec=$sec): $e");
@@ -74,16 +111,10 @@ Future<void> _initFcm() async {
   }
 }
 
-/// Minimal unawaited helper (no extra package needed)
-void unawaited(Future<void> f) {}
+void unawaited(Future<void> future) {}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  Future<bool> checkFirstRun() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool("hasSeenDistrictSelection") ?? false;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,17 +134,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: FutureBuilder<bool>(
-        future: checkFirstRun(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const SizedBox.shrink();
-
-          final isSeen = snapshot.data!;
-          return isSeen
-              ? const MainNavigationPage()
-              : const DistrictSelectionPage();
-        },
-      ),
+      home: const AppStartController(),
     );
   }
 }
